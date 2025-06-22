@@ -196,5 +196,5 @@ cython_debug/
 # Protect secrets
 config.yaml
 
-outputs/*.md
+!outputs/*.md
 seen/seen_ids.txt

@@ -2,7 +2,7 @@ import os
 import openai
 import arxiv
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -11,9 +11,8 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ==== 設定 ====
-CATEGORY = "cs.LG"
-NUM_DAYS = 30
-MAX_RESULTS = 5
+CATEGORY = "cs.*"
+MAX_RESULTS = 1
 OUTPUT_DIR = Path("outputs")
 SEEN_IDS_FILE = Path("seen/seen_ids.txt")
 
@@ -31,23 +30,19 @@ def save_seen_id(arxiv_id: str) -> None:
     with open(SEEN_IDS_FILE, "a", encoding="utf-8") as f:
         f.write(f"{arxiv_id}\n")
 
-# ==== 論文取得 ====
-def get_paper_by_date(target_date: datetime):
+# ==== 論文取得（強制取得）====
+def get_first_unseen_paper():
     seen_ids = load_seen_ids()
 
     search = arxiv.Search(
         query=f"cat:{CATEGORY}",
-        max_results=MAX_RESULTS * 5,
+        max_results=MAX_RESULTS * 10,
         sort_by=arxiv.SortCriterion.SubmittedDate,
     )
 
     for result in arxiv.Client().results(search):
         arxiv_id = result.get_short_id()
-        published_date = result.published.date()
-
         if arxiv_id in seen_ids:
-            continue
-        if published_date != target_date.date():
             continue
 
         save_seen_id(arxiv_id)
@@ -91,14 +86,13 @@ def generate_tags(title: str, summary: str) -> list[str]:
         ],
         temperature=0.3,
     )
-
     tags_text = response.choices[0].message.content.strip()
     tags = [tag.strip() for tag in tags_text.split() if tag.startswith("#")]
     return tags[:3]
 
-# ==== Markdown整形 ====
-def format_entry(paper, summary_en, summary_ja, tags: list[str]):
-    entry = f"""## 🎓 {paper.title} ({paper.published.date()})
+# ==== Markdown出力 ====
+def format_entry(paper, summary_en, summary_ja, tags: list[str]) -> str:
+    return f"""## 🎓 {paper.title} ({paper.published.date()})
 
 - 🇬🇧 {summary_en}
 - 🇯🇵 {summary_ja}
@@ -107,29 +101,20 @@ def format_entry(paper, summary_en, summary_ja, tags: list[str]):
 - 🔗 [{paper.entry_id}]({paper.entry_id})
 ---
 """
-    return entry
 
 # ==== 実行 ====
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--date", help="Target date in YYYY-MM-DD format", type=str)
+    parser.add_argument("--date", help="(無視されます) 互換性のための引数", type=str)
     args = parser.parse_args()
 
-    if args.date:
-        try:
-            target_date = datetime.strptime(args.date, "%Y-%m-%d")
-        except ValueError:
-            print("❌ Invalid date format. Use YYYY-MM-DD.")
-            return
-    else:
-        target_date = datetime.utcnow()
-
-    papers = get_paper_by_date(target_date)
+    papers = get_first_unseen_paper()
     if not papers:
-        print(f"📬 No new papers found on {target_date.date()}.")
+        print("📬 No new papers found.")
         return
 
-    output_path = OUTPUT_DIR / f"{target_date.strftime('%Y-%m-%d')}.md"
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    output_path = OUTPUT_DIR / f"{today_str}.md"
 
     with open(output_path, "w", encoding="utf-8") as f:
         for paper in papers:
