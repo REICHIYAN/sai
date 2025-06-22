@@ -9,6 +9,9 @@ jobs:
   run-bot:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # ✅ push のために必須
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -31,10 +34,12 @@ jobs:
       - name: Run build_pages.py
         run: python3 scripts/build_pages.py
 
-      - name: Commit and push docs
+      - name: Commit and push updates
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add outputs/ docs/
-          git commit -m "🤖 Daily update"
+          git commit -m "🤖 Daily update" || echo "Nothing to commit"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
