@@ -58,13 +58,13 @@ on:
 
 ---
 
-## 🧠 出力例
+## 🧐 出力例
 
 ```markdown
 ## 🎓 Paper Title (2025-06-22)
 
-- 🇬🇧 Summary（200〜280文字）
-- 🇯🇵 要約（140〜200文字）
+- 🇬🋧 Summary（200〜280文字）
+- 🇨🇭 要約（140〜200文字）
 - ハッシュタグ：#cs.LG #cs.AI
 - 🔗 [arXivリンク](https://arxiv.org/abs/2506.12345)
 ---
@@ -79,11 +79,17 @@ on:
 
 ---
 
-## 🧩 TODO / 今後の展望
+## 🧰 TODO / 今後の展望
 
 * [ ] `seen_ids.txt` による重複回避（実装中）
 * [ ] タグ自動分類（LLM分類器）
 * [ ] GitHub Pages による公開日報化
+
+---
+
+## 🌐 公開ページ
+
+📄 [https://reichiyan.github.io/sai/](https://reichiyan.github.io/sai/)
 
 ---
 
