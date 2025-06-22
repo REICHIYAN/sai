@@ -1,0 +1,35 @@
+name: Daily Paper Summary
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # JST 8:00
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: Install dependencies
+        run: |
+          pip install openai arxiv
+
+      - name: Run summarizer
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python scripts/fetch_and_summarize.py
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'bot@example.com'
+          git add daily_summary/
+          git commit -m "Daily summary: $(date '+%Y-%m-%d')" || echo "No changes"
+          git push
+
