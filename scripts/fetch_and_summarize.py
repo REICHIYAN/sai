@@ -55,7 +55,7 @@ def get_first_unseen_paper():
 
     return []
 
-# ==== 要約処理（簡素プロンプトで安定化）====
+# ==== 要約処理 ====
 def summarize_ja(arxiv_id: str, abstract: str, url: str) -> str:
     prompt = f"次の英文要約を、日本語で105文字以内に簡潔に要約してください：\n{abstract}"
 
@@ -78,7 +78,7 @@ def summarize_ja(arxiv_id: str, abstract: str, url: str) -> str:
     else:
         summary = summary[:105]
 
-    # Markdown改行を安全に書式化（式内に \n を含めない）
+    # f-string 内にバックスラッシュを含めないよう修正
     output = summary + "\n" + f"[Link]({url})"
     return output
 
