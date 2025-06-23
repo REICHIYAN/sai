@@ -62,21 +62,25 @@ def summarize_ja(arxiv_id: str, abstract: str, url: str) -> str:
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "あなたは日本語で簡潔に書く技術ライターです。出力は全角105文字以内にしてください。"},
+            {
+                "role": "system",
+                "content": "あなたは日本語で簡潔に書く技術ライターです。出力は全角105文字以内にしてください。"
+            },
             {"role": "user", "content": prompt},
         ],
         temperature=0.3,
-        max_tokens=110,  # GPTの内部トークン制限（≒日本語100〜120文字）
+        max_tokens=110,
     )
 
     summary = response.choices[0].message.content.strip()
     if not summary:
         summary = "（要約取得失敗）"
     else:
-        summary = summary[:105]  # 万一のオーバーラン対策
+        summary = summary[:105]
 
-    # return f"arXiv:{arxiv_id}\n{summary}\n[Link]({url})"
-    return f"{summary}\n[Link]({url})"
+    # Markdown改行を安全に書式化（式内に \n を含めない）
+    output = summary + "\n" + f"[Link]({url})"
+    return output
 
 # ==== メイン処理 ====
 def main():
