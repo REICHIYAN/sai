@@ -7,22 +7,36 @@ DOCS_DIR = Path("docs")
 DOCS_DIR.mkdir(exist_ok=True)
 
 def convert_md_to_html(md_path: Path) -> str:
-    """Markdownファイルを簡易HTMLに変換（リンク対応済）"""
-    content = md_path.read_text(encoding="utf-8")
+    """2行構成（要約 + URL）MarkdownファイルをHTMLに変換"""
+    content = md_path.read_text(encoding="utf-8").strip()
+    lines = content.splitlines()
 
-    def convert_line(line: str) -> str:
-        if not line.strip():
-            return ""
-        if line.startswith("## "):
-            return f"<h2>{html.escape(line[3:])}</h2>"
-        line = re.sub(
-            r"\[([^\]]+)\]\(([^)]+)\)",
-            lambda m: f'<a href="{html.escape(m.group(2))}">{html.escape(m.group(1))}</a>',
-            line
-        )
-        return f"<p>{html.escape(line)}</p>"
+    html_parts = []
+    block = []
 
-    body = "\n".join(convert_line(line) for line in content.splitlines())
+    for line in lines:
+        line = line.strip()
+        if not line:
+            if block:
+                # 2行目がURLならリンク付きで出力
+                summary = html.escape(block[0])
+                if len(block) > 1 and block[1].startswith("http"):
+                    url = html.escape(block[1])
+                    html_parts.append(f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>")
+                else:
+                    html_parts.append(f"<p>{summary}</p>")
+                block = []
+            continue
+        block.append(line)
+
+    # 最後のブロック処理
+    if block:
+        summary = html.escape(block[0])
+        if len(block) > 1 and block[1].startswith("http"):
+            url = html.escape(block[1])
+            html_parts.append(f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>")
+        else:
+            html_parts.append(f"<p>{summary}</p>")
 
     title = html.escape(md_path.stem)
     return (
@@ -34,14 +48,13 @@ def convert_md_to_html(md_path: Path) -> str:
         f"  <title>{title}</title>\n"
         "</head>\n"
         "<body>\n"
-        f"  <h1>{title}</h1>\n"
-        f"  {body}\n"
-        "</body>\n"
-        "</html>\n"
+        f"<h1>{title}</h1>\n"
+        + "\n".join(html_parts) +
+        "\n</body>\n</html>\n"
     )
 
 def build_index():
-    """全HTML出力＋indexページ作成"""
+    """すべてのMarkdown→HTMLに変換し、indexページを作成"""
     md_files = sorted(OUTPUTS_DIR.glob("*.md"), reverse=True)
     if not md_files:
         print("⚠️ Markdownファイルが見つかりません。")
@@ -61,7 +74,6 @@ def build_index():
         if i == 0:
             latest_file = html_file.name
 
-    # 改行を含む文字列を f-string 外で定義
     entries_html = "\n".join(entries)
     latest_link = latest_file.replace(".html", "") if latest_file else ""
 

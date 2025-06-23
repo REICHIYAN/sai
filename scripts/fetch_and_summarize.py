@@ -76,11 +76,9 @@ def summarize_ja(arxiv_id: str, abstract: str, url: str) -> str:
     if not summary:
         summary = "（要約取得失敗）"
     else:
-        summary = summary[:105]
+        summary = summary.replace("\n", " ").strip()[:105]  # 改行削除＋文字数制限
 
-    # f-string 内にバックスラッシュを含めないよう修正
-    output = summary + "\n" + f"[Link]({url})"
-    return output
+    return summary + "\n" + f"[Link]({url})"
 
 # ==== メイン処理 ====
 def main():
