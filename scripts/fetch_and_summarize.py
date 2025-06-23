@@ -2,7 +2,7 @@ import os
 import openai
 import arxiv
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,9 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# ==== 設定 ====
-CATEGORY = "cs.*"
+# ==== 定数 ====
+CATEGORIES = ["cs.AI", "cs.CL", "cs.CV", "cs.LG", "cs.NE"]
 MAX_RESULTS = 1
+DAYS_BACK = 365
 OUTPUT_DIR = Path("outputs")
 SEEN_IDS_FILE = Path("seen/seen_ids.txt")
 
@@ -30,83 +31,58 @@ def save_seen_id(arxiv_id: str) -> None:
     with open(SEEN_IDS_FILE, "a", encoding="utf-8") as f:
         f.write(f"{arxiv_id}\n")
 
-# ==== 論文取得（強制取得）====
+# ==== 論文取得 ====
 def get_first_unseen_paper():
     seen_ids = load_seen_ids()
+    start_time = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
 
+    query = " OR ".join([f"cat:{cat}" for cat in CATEGORIES])
     search = arxiv.Search(
-        query=f"cat:{CATEGORY}",
+        query=query,
         max_results=MAX_RESULTS * 10,
         sort_by=arxiv.SortCriterion.SubmittedDate,
     )
 
-    for result in arxiv.Client().results(search):
+    client = arxiv.Client()
+    for result in client.results(search):
+        if result.published < start_time:
+            continue
         arxiv_id = result.get_short_id()
         if arxiv_id in seen_ids:
             continue
-
         save_seen_id(arxiv_id)
         return [result]
 
     return []
 
-# ==== 要約処理 ====
-def summarize(text: str, lang: str) -> str:
-    if lang == "en":
-        prompt = f"Summarize the following abstract in English in 200 to 280 characters:\n{text}"
+# ==== 要約処理（簡素プロンプトで安定化）====
+def summarize_ja(arxiv_id: str, abstract: str, url: str) -> str:
+    prompt = f"次の英文要約を、日本語で105文字以内に簡潔に要約してください：\n{abstract}"
+
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "あなたは日本語で簡潔に書く技術ライターです。出力は全角105文字以内にしてください。"},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+        max_tokens=110,  # GPTの内部トークン制限（≒日本語100〜120文字）
+    )
+
+    summary = response.choices[0].message.content.strip()
+    if not summary:
+        summary = "（要約取得失敗）"
     else:
-        prompt = f"次の英文要約を、日本語で140〜200文字に要約してください：\n{text}"
+        summary = summary[:105]  # 万一のオーバーラン対策
 
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a concise academic assistant."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.3,
-    )
-    return response.choices[0].message.content.strip()
+    # return f"arXiv:{arxiv_id}\n{summary}\n[Link]({url})"
+    return f"{summary}\n[Link]({url})"
 
-# ==== タグ補完 ====
-def generate_tags(title: str, summary: str) -> list[str]:
-    prompt = f"""以下は論文のタイトルと要約です。
-この論文の主な技術・研究分野を、英語のハッシュタグ形式で最大3つ出力してください（例：#LLM #ReinforcementLearning）。
-
-タイトル：
-{title}
-
-要約：
-{summary}
-"""
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are an expert in machine learning research topics."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.3,
-    )
-    tags_text = response.choices[0].message.content.strip()
-    tags = [tag.strip() for tag in tags_text.split() if tag.startswith("#")]
-    return tags[:3]
-
-# ==== Markdown出力 ====
-def format_entry(paper, summary_en, summary_ja, tags: list[str]) -> str:
-    return f"""## 🎓 {paper.title} ({paper.published.date()})
-
-- 🇬🇧 {summary_en}
-- 🇯🇵 {summary_ja}
-- タグ：{' '.join(tags)}
-- ハッシュタグ：#{' '.join(paper.categories)}
-- 🔗 [{paper.entry_id}]({paper.entry_id})
----
-"""
-
-# ==== 実行 ====
+# ==== メイン処理 ====
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--date", help="(無視されます) 互換性のための引数", type=str)
-    args = parser.parse_args()
+    parser.add_argument("--date", help="※未使用：互換性のために存在", type=str)
+    parser.parse_args()
 
     papers = get_first_unseen_paper()
     if not papers:
@@ -118,11 +94,13 @@ def main():
 
     with open(output_path, "w", encoding="utf-8") as f:
         for paper in papers:
-            summary_en = summarize(paper.summary, lang="en")
-            summary_ja = summarize(paper.summary, lang="ja")
-            tags = generate_tags(paper.title, paper.summary)
-            entry = format_entry(paper, summary_en, summary_ja, tags)
-            f.write(entry + "\n")
+            print(f"🧾 Summarizing: {paper.title}")
+            summary = summarize_ja(
+                arxiv_id=paper.get_short_id(),
+                abstract=paper.summary,
+                url=paper.entry_id
+            )
+            f.write(summary + "\n\n")
 
     print(f"✅ Summary written to {output_path}")
 
