@@ -1,14 +1,14 @@
 # 📚 sai - arXiv Daily Summarizer
 
 `sai` は、最新の arXiv 論文（特に Machine Learning 分野）を毎日 1 件要約し、
-英語・日本語の両方で Markdown に出力する自動化ツールです。
+日本語で Markdown に出力する自動化ツールです。
 
 ---
 
 ## 🚀 機能概要
 
 * arXiv から `cs.LG` カテゴリの最新論文を1件取得（過去365日以内）
-* 英語（200〜280文字）と日本語（140〜200文字）で要約
+* 日本語（100文字）で要約
 * `outputs/YYYY-MM-DD.md` に Markdown 出力
 * `.env` に保存された OpenAI API キーを使用
 * GitHub Actions を用いて定期実行 & 自動コミットも可能
