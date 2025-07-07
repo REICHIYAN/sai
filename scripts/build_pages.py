@@ -1,6 +1,5 @@
 from pathlib import Path
 import html
-import re
 
 OUTPUTS_DIR = Path("outputs")
 DOCS_DIR = Path("docs")
@@ -18,27 +17,30 @@ def convert_md_to_html(md_path: Path) -> str:
         line = line.strip()
         if not line:
             if block:
-                # 2行目がURLならリンク付きで出力
-                summary = html.escape(block[0])
-                if len(block) > 1 and block[1].startswith("http"):
-                    url = html.escape(block[1])
-                    html_parts.append(f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>")
+                summary = html.escape(block[0], quote=True)
+                url = html.escape(block[1], quote=True) if len(block) > 1 and block[1].startswith("http") else None
+                if url:
+                    html_parts.append(
+                        f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>"
+                    )
                 else:
                     html_parts.append(f"<p>{summary}</p>")
                 block = []
             continue
         block.append(line)
 
-    # 最後のブロック処理
+    # 最後のブロック処理（空行で終わらなかった場合）
     if block:
-        summary = html.escape(block[0])
-        if len(block) > 1 and block[1].startswith("http"):
-            url = html.escape(block[1])
-            html_parts.append(f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>")
+        summary = html.escape(block[0], quote=True)
+        url = html.escape(block[1], quote=True) if len(block) > 1 and block[1].startswith("http") else None
+        if url:
+            html_parts.append(
+                f"<p>{summary}<br>\n<a href=\"{url}\">{url}</a></p>"
+            )
         else:
             html_parts.append(f"<p>{summary}</p>")
 
-    title = html.escape(md_path.stem)
+    title = html.escape(md_path.stem, quote=True)
     return (
         "<!DOCTYPE html>\n"
         "<html lang=\"ja\">\n"
@@ -68,7 +70,7 @@ def build_index():
         html_content = convert_md_to_html(md_file)
         html_file.write_text(html_content, encoding="utf-8")
 
-        display = html.escape(md_file.stem)
+        display = html.escape(md_file.stem, quote=True)
         entries.append(f'<li><a href="{html_file.name}">{display}</a></li>')
 
         if i == 0:
